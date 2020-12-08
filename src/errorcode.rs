@@ -1,0 +1,88 @@
+use lazy_static::lazy_static;
+
+/// Get message associated with error code. If message isn't found, returns the code
+pub fn lookup_error(code: &str) -> &str {
+    for v in ERROR_CODES.iter() {
+        if v.0 == code {
+            return v.1;
+        }
+    }
+    code
+}
+
+lazy_static! {
+    static ref ERROR_CODES: Vec<(&'static str, &'static str)> = vec! {
+    ("S1","Something went wrong, sorry about that."),
+    ("S2","No session found, please refresh your browser window!"),
+    ("S3","Resource could not be changed!"),
+    ("S4","You need to be logged in to view this content."),
+    ("S6","This feature is not available in offline mode."),
+    ("S7","The request took too long to complete. Please try again."),
+    ("C1","The request was malformed."),
+    ("C5","Some required parameters are missing from this request."),
+    ("C6","We were not able to parse this spreadsheet."),
+    ("C7","This conversion is not offered, yet."),
+    ("C8","Your data might have the wrong format."),
+    ("C9","This collection is converting, please try again in a moment."),
+    ("C10","This collection has been deleted."),
+    ("C11","We are doing some maintainance work right now. Sorry for the inconvenience, please check back again soon."),
+    ("C12","The collection you are trying to access is currently being updated to the newest version of Zenkit. Please try again in a few minutes"),
+    ("C13","The collection needs to have at least one label field with 2 or more labels in order to be a task collection"),
+    ("C14","There is already a resource that matches the given identifiers."),
+    ("C15","The field description can't be longer than 65535 characters."),
+    ("C17","You can't update static fields."),
+    ("C18","The collection has no calendar synchronization settings."),
+    ("C19","Please cancel your Zenkit subscription before you delete your account."),
+    ("C2","The requested resource could not be found."),
+    ("C3","There is no public view for this collection."),
+    ("C16","We could not find the field."),
+    ("D1","You have reached the limit of your current plan. Please upgrade to continue."),
+    ("D2","You have reached a fixed limit of the API (spam protection)."),
+    ("E1","Time has run out!"),
+    ("E2","This link might have been disabled or was used already!"),
+    ("E3","This resource is not eligible!"),
+    ("A1","Your session is not valid anymore, it might have expired. Please refresh your browser window."),
+    ("A2","The email, username or password is incorrect. Please try again."),
+    ("A3","Your password does not conform to the minimum requirements. Please choose a different one."),
+    ("A5","You have no access to this page."),
+    ("A6","Your API key is not valid."),
+    ("A7","Missing Permissions."),
+    ("A8","Your password is blacklisted because it is too commonly used. Please use a different one."),
+    ("FT1","The filetype is not supported"),
+    ("FP1","Jimp can nit read the give file"),
+    ("FP2","Jimp can not resize given image"),
+    ("FP3","Jimp can not crop given image"),
+    ("FORM1","Cyclic formula detected. Please remove any self-references or references to formulas that use this field."),
+    ("FORM2","Syntax error: Character '$2' is not allowed at position $1."),
+    ("FORM3","Field $1 does not exist in this collection."),
+    ("FORM4","There is no reference field $1."),
+    ("FORM5","Field $1 does not exist in entries referenced by $2."),
+    ("FORM6","Field $1 is pointing to a collection that has been deleted."),
+    ("FORM7","You are attempting to perform a division by zero."),
+    ("CAMPMON1","Email address is missing or incorrectly formatted."),
+    ("CAMPMON2","Couldn't find a subscriber with this email in the list."),
+    ("CAMPMON3","The request contained an unknown parameter."),
+    ("CAMPMON4","Could not deserialize the request. Check CampaignMonitor API Documentation."),
+    ("CAMPMON5","The subscriber has not confirmed their subscription yet."),
+    ("CAMPMON6","Email Address has existed in the selected list before, and currently exists in suppression list. Subscriber is not added."),
+    ("CAMPMON7","Email Address exists in deleted list. Subscriber is not added."),
+    ("CAMPMON8","Email Address exists in unsubscribed list. Subscriber is not added."),
+    ("CAMPMON9","Email Address exists in bounced list. Subscriber is not added."),
+    ("CAMPMON10","New Email Address is already subscribed to the list. Subscriber not updated."),
+    ("CAMPMON11","This subscription has already been confirmed."),
+    ("CAMPMON12","This type of webhook could not be handled."),
+    ("REM1","Cannot create a reminder that is set to a time in the past."),
+    ("EMAIL1","This email address is not a collection email address. Please go to your Email to Collection settings to find the right email address."),
+    ("EMAIL2","The address hash does not match the collection hash."),
+    ("EMAIL3","Email data has not been matched to Zenkit fields for this collection. Please go to your Email to Collection settings to match fields to email content."),
+    ("EMAIL4","This user does not exist."),
+    ("EMAIL5","This user does not have access to this collection."),
+    ("EMAIL6","This collection or it's workspace doesn't exist or has been deleted."),
+    ("EMAIL7","Something went wrong when creating attachment files."),
+    ("EMAIL8","You have exceeded the maximum number of emails that can be sent per hour to this collection."),
+    ("2FA1","Your two factor secret expired."),
+    ("2FA2","Your code could not be verified."),
+    ("2FA3","Two Factor Authentication is enabled but no security code was provided."),
+    ("OAUTH1","Your authorization request expired."),
+    };
+}
