@@ -1,13 +1,10 @@
 use crate::types::ErrorInfo;
 use std::fmt;
 
-// re-export Result
-pub use std::result::Result;
-
 /// Errors returned by this crate
 #[derive(Debug)]
 pub enum Error {
-    /// Error returned from Zenkit
+    /// Error returned from Zenkit: (http status, optional zenkit-defined error code)
     ApiError(u16, Option<ErrorInfo>),
     /// Error serializing or deserializing json data
     JsonError(String),
@@ -33,6 +30,18 @@ pub enum Error {
 
     /// Error that doesn't fit any of the above
     Other(String),
+}
+
+impl Error {
+    /// Returns true if the error means a rate limit has been hit
+    pub fn is_rate_limit(&self) -> bool {
+        if let Error::ApiError(_, Some(info)) = self {
+            if &info.code == "D1" || &info.code == "D2" {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl std::error::Error for Error {}

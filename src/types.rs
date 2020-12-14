@@ -1,39 +1,39 @@
 #![allow(missing_docs)]
-/// This module defines the data types used in the ZenKit Api.
-/// The names and fields are based on the definitions in the online documentation
-///      (as of Sept 2020)
-/// Some higher-level abstractions and apis are in the workspace module.
-///
-/// Some inconsistencies in the original rest api:
-/// - In the ZenKit api, there are multiple conflicting standards for field and enum names.
-///   - enum: sometimes initial caps, sometimes not
-///   - field: sometimes camelCase, snake_case,
-///     and often mixed inside same struct (comment_count, updated_by, sortOrder, ...)
-/// - Sometimes joined words don't use camelCase: ('elementcategory','User:displayname')
-///     (and yet other places there is 'displayName')
-/// - Enum values: AccessType values are capitalized, but LoginProvider values are uncapitalized
-///     even though most LoginProviders are company names
-/// - Sometimes foreign id fields are type ID, sometimes type int
-///     Sometimes uuid fields are type UUID, sometimes type string
-///     Sometimes date fields are DateString, sometimes String
-/// - Color names: color_hex (in Background) but icon_color (no _hex suffix),
-///   even though value is hex. In this api, all color field names omit _hex suffix.
-///
-/// Changes made for consistency:
-/// All struct, enum and field names are per the rust capitalization convention,
-///   (Pascal case for struct/enum names, snake_case for field names)
-///   Serde rules are used to map to/from the json format on a per-field/per-struct basis
-/// All color fields use 'color' (no _hex suffix)
-/// Whenever I felt mostly confident that a type could be made more specific, I did so
-///   (String -> UUID, int -> ID, String -> DateString), etc.
-///
-use crate::{f32_or_str, Error, Result};
+//! This module defines the data types used in the ZenKit Api. Most are specified
+//! by [Zenkit API Docs](https://base.zenkit.com/docs/api/overview/introduction),
+//! and a few have been added to make the code more Rust-idiomatic.
+//!
+//! Structs defined here that aren't directly in Zenkit API:
+//! - ListInfo - wraps a List with its field definitions, and contains business field getters and setters.
+//! - Item - wraps a list Entry, and has getters and setters to simplify access to business fields.
+//!   (derefs to Entry)
+//! - Various structures whose names have a suffix of 'Request' or 'Response', for api parameters and
+//!   responses.
+//! - ChangedArray,ChangedValue - describe data changed inside an Activity object
+//!
+//! All struct, enum and field names follow Rust naming and capitalization convention,
+//!   (Pascal case for struct/enum names, snake_case for field names)
+//!   Serde rules are used to map to/from the json-defined names on a per-field/per-struct basis
+//! All color fields use 'color' (no _hex suffix)
+//! Whenever I felt fairly confident that a type could be made more specific, I did so
+//!   (String -> UUID, int -> ID, String -> DateString), etc.
+
+use crate::{f32_or_str, Error};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{clone::Clone, default::Default, fmt, iter::Iterator};
+
+// re-export from item and list
+pub use crate::{
+    item::Item,
+    list::{
+        fset_f, fset_i, fset_id, fset_s, fset_t, fset_vid, fset_vs, fup_f, fup_i, fup_id, fup_s,
+        fup_t, fup_vid, fup_vs, FieldSetVal, FieldVal, ListInfo,
+    },
+};
 
 /// Zenkit-assigned Object ID (positive int)
 pub type ID = u64;
@@ -48,7 +48,7 @@ pub type ErrorCode = String;
 
 //pub type ListSettings = Value;
 //pub type Notification = Value;
-/// Alias for json
+/// string-indexed map of json values
 pub type JsonMap = serde_json::map::Map<String, Value>;
 
 /// Field is new/UI name for Element
@@ -74,6 +74,16 @@ pub enum AllId {
     UUID(String),
     /// Any of the above, as a string
     Any(String),
+}
+
+/// Zenkit object with ID and UUID
+pub trait ZKObjectID {
+
+    /// Returns the zenkit-assigned ID (positive int)
+    fn get_id(&self) -> ID;
+
+    /// Returns the zenkit-assigned uuid
+    fn get_uuid(&self) -> &UUID;
 }
 
 impl fmt::Display for AllId {
@@ -140,7 +150,7 @@ pub enum SortDirection {
     Desc,
 }
 
-/// Element (field) data type
+/// Element(field) data type
 #[derive(
     strum_macros::Display,
     Serialize_repr,
@@ -160,7 +170,7 @@ pub enum ElementCategoryId {
     /// URL (Link) field
     #[allow(non_camel_case_types)]
     URL = 3,
-    /// Date fieid
+    /// Date field
     Date = 4,
     /// Checkbox (boolean) field
     Checkbox = 5,
@@ -180,7 +190,7 @@ pub enum ElementCategoryId {
     UserUpdatedBy = 12,
     /// user deprecated by field
     UserDeprecatedBy = 13,
-    /// person or list of personss
+    /// person or list of persons
     Persons = 14,
     /// file field (e.g., attachment)
     Files = 15,
@@ -194,20 +204,31 @@ pub enum ElementCategoryId {
     Dependencies = 19,
 }
 
+/// for elements of type Category, PredefinedCategory defines the choices
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct PredefinedCategory {
+    /// object id
     pub id: ID,
+    /// object short id
     #[serde(rename = "shortId")]
     pub short_id: ShortId,
+    /// object uuid
     pub uuid: UUID,
+    /// category name
     pub name: String,
+    /// color, in hex
     #[serde(rename = "colorHex")]
     pub color: String,
+    /// date created
     pub created_at: DateString,
+    /// date updated
     pub updated_at: DateString,
+    /// date deprecated
     pub deprecated_at: Option<DateString>,
+    /// element(field) id
     #[serde(rename = "elementId")]
     pub element_id: ID,
+    /// containing list id
     #[serde(rename = "listId")]
     pub list_id: ID,
     //origin_data: Option<Value>, // null
@@ -215,48 +236,67 @@ pub struct PredefinedCategory {
     //origin_created_at
     //origin_deprecated_at
     //origin_updated_at
+    /// list of resource tags
     #[serde(rename = "resourceTags")]
     pub resource_tags: Vec<Value>,
+    /// sort order
     #[serde(rename = "sortOrder", deserialize_with = "f32_or_str")]
     pub sort_order: f32,
 }
 
+impl ZKObjectID for PredefinedCategory {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// Embedded list, if accessible
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(untagged)]
 pub enum ChildList {
+    /// Embedded list
     Child(List),
+    /// No accessible list
     NoList(NoAccessList),
 }
 
-#[allow(missing_docs)]
+/// Inaccessible lit
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct NoAccessList {
+    /// user does not have access to list
     #[serde(rename = "ACCESS_DENIED")]
     pub access_denied: bool,
+    /// list is deprecated
     pub deprecated_at: Option<String>,
+    /// list name
     pub name: String,
+    /// list uuid
     pub uuid: String,
 }
 
+/// definition of type of data held by Element/field
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct ElementData {
     /// for elements of type Category, predefined_categories defines the choices
     #[serde(rename = "predefinedCategories")]
     pub predefined_categories: Option<Vec<PredefinedCategory>>,
 
+    /// true if the field can have multiple values (labels, persons, etc.)
     #[serde(default = "default_bool")]
     pub multiple: bool,
 
+    /// embedded list, for hierarchies
     #[serde(rename = "childList")]
     pub child_list: Option<ChildList>,
     //#[serde(rename = "childListElements")]
     //child_list_elements: Option<Vec<Element>>,
+    /// uuid of child list, for hierarchies
     #[serde(rename = "childListUUID")]
     pub child_list_uuid: Option<UUID>,
+    /// mirror element
     #[serde(rename = "mirrorElementUUID")]
     pub mirror_element_uuid: Option<UUID>,
 
-    /// everything else
+    /// catch-all for all other fields
     #[serde(flatten)]
     pub fields: JsonMap,
     /*
@@ -271,12 +311,15 @@ pub struct ElementData {
     */
 }
 
+/// Definitions of business data (user-defined) fields
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct BusinessData {
+    /// field definitions
     #[serde(flatten)]
     pub fields: JsonMap,
 }
 
+/// Metadata about label/choice fields
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct ElementDataCategories {
     #[serde(rename = "allowInlineCreation")]
@@ -307,7 +350,7 @@ pub struct GetEntriesRequest {
     pub limit: usize,
     /// number of entries to skip
     pub skip: usize,
-    /// whether to include depcecated entries
+    /// whether to include deprecated entries
     #[serde(rename = "allowDeprecated")]
     pub allow_deprecated: bool,
     /// sort order
@@ -331,11 +374,27 @@ impl Default for GetEntriesRequest {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GetEntriesViewRequest {
+    /// filter-object to filter the response
     pub filter: Value,
+    /// optional group_by (for persons and categories)
     pub group_by_element_id: ID,
+    /// number of items to return
     pub limit: u64,
+    /// starting item number
     pub skip: u64,
+    /// Allow deprecated entries to be included in the response.
+    /// countData will also count deprecated entries in this case.
+    /// An additional property called countDataNonDeprecated{total, filteredTotal} will be added,
+    /// that does not count deprecated items.
     pub allow_deprecated: bool,
+    /// Divide the entries into two groups, todo and done.
+    /// This only works for lists that have the task addon activated,
+    /// meaning that list.settings.tasks is set.
+    /// Calling the route with this parameter set to true for a list that is not a task list
+    /// will result in an error (LIST_HAS_NO_TASK_ELEMENT:C13).
+    /// If everything works out, the result will contain countDataPerGroup
+    /// for the keys "todo" and "done":
+    /// {todo: {total: n, filteredTotal: m}, done: {total: i, filteredTotal: j}}.
     pub task_style: bool,
 }
 
@@ -352,38 +411,53 @@ impl Default for GetEntriesViewRequest {
     }
 }
 
+/// filtered view response data
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterCountData {
+    /// total number of items returned
     pub total: u64,
+    /// number of filtered items
     pub filtered_total: u64,
-    /// any other fields
+    /// All other response fields go into the catch-all 'fields'
     #[serde(flatten)]
     pub fields: JsonMap,
 }
 
+/// Response returned from get_entries_for_list_view
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct GetEntriesViewResponse {
+    /// number of filtered items returned
     pub count_data: FilterCountData,
+    /// per group counts (todo, done, etc.)
     pub count_data_per_group: Vec<FilterCountData>,
+    /// entries returned
     pub list_entries: Vec<Entry>,
 }
 
+/// Error details returned from Zenkit
+//noinspection SpellCheckingInspection
 #[derive(Deserialize, Debug)]
-// in api docs this is 'StrucdError', but I kept misspelling it so I'm calling it ErrorInfo
+// in api docs this is "StrucdError", but I kept misspelling it so I'm calling it ErrorInfo
 pub struct ErrorInfo {
+    /// Error name
     pub name: String,
+    /// Error code (see errorcode.rs)
     pub code: ErrorCode,
     /// HTTP status code
     #[serde(rename = "statusCode")]
     pub status_code: u16,
+    /// Error message
     pub message: String,
+    /// Additional description
     pub description: String,
 }
 
+/// Error response returned from Zenkit
 #[derive(Deserialize, Debug)]
 pub struct ErrorResult {
+    /// Error detailed info
     pub error: ErrorInfo,
 }
 
@@ -423,12 +497,14 @@ pub enum AccessType {
     Project,
 }
 
+/// User access type and role
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Access {
     pub id: Option<ID>,
     #[serde(rename = "shortId")]
     pub short_id: Option<ShortId>,
     pub uuid: Option<UUID>,
+    /// scope of access
     #[serde(rename = "accessType")]
     pub access_type: AccessType,
     #[serde(rename = "userId")]
@@ -439,11 +515,10 @@ pub struct Access {
     pub list_id: Option<ID>,
     #[serde(rename = "organizationId")]
     pub organization_id: Option<ID>,
+    /// Access role
     #[serde(rename = "roleId")]
     pub role_id: RoleID,
     pub created_at: Option<DateString>,
-    pub updated_at: Option<DateString>,
-    pub deprecated_at: Option<DateString>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -474,6 +549,7 @@ pub enum ElementCategoryGroup {
     Control,
 }
 
+/// Metadata about field data type
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementCategory {
@@ -523,6 +599,8 @@ pub struct ElementCategory {
     pub created_at: DateString,
 }
 
+/// Field definition
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Element {
     pub id: ID, // The ID
@@ -620,168 +698,294 @@ impl Element {
     }
 }
 
+impl ZKObjectID for Element {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// Type of numeric field
 pub enum NumericType {
+    /// Integer (signed)
     Integer,
+    /// Decimal - in Rust, interpreted as float
     Decimal,
 }
 
+/// Activity filter type
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum ActivityFilter {
+    /// All activities (no filter)
     All = 0,
-    SystemMessages = 1, // unused
+    /// System messages (unused?)
+    SystemMessages = 1,
+    /// Comments
     Comments = 2,
+    /// Deleted
     Deleted = 3,
 }
 
+/// Type of activity
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum ActivityType {
+    /// Comment
     Comment = 0,
+    /// resource was created
     ResourceCreated = 1,
+    /// resource was updated
     ResourceUpdated = 2,
+    /// resource was deprecated
     ResourceDeprecated = 3,
+    /// resource was imported
     ResourceImported = 4,
+    /// resource was copied
     ResourceCopied = 5,
+    /// resource was restored
     ResourceRestored = 6,
+    /// bulk operation in list
     BulkOperationInList = 7,
+    /// resource was deleted
     ResourceDeleted = 8,
 }
 
+/// Where activity occurred
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum ActivityCreatedIn {
+    /// in workspace
     Workspace = 0,
+    /// list
     List = 1,
+    /// list entry (item)
     ListEntry = 2,
+    /// list element (field)
     ListElement = 3,
 }
 
+/// Activity type for bulk action
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum ActivityBulkAction {
+    /// add value
     Add = 0,
+    /// set value
     Set = 1,
+    /// remove value
     Remove = 2,
+    /// replace value
     Replace = 3,
 }
 
+/// Data that changed
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityChangedData {
+    ///
     pub bulk_action: ActivityBulkAction,
 }
 
+/// Activity report
+//noinspection SpellCheckingInspection
 #[derive(Deserialize, Debug)]
 pub struct Activity {
+    /// activity id
     pub id: ID,
+    // short id
     //#[serde(rename = "shortId")]
     //pub short_id: ShortId,
+    /// activity uuid
     pub uuid: UUID,
     #[serde(rename = "type")]
+    /// Activity type
     pub activity_type: ActivityType,
+    /// object type
     pub created_in: ActivityCreatedIn,
-    /// message: Only used if activity type is Comment
+    /// message - only used if activity type is Comment
     pub message: Option<String>,
+    /// whether activity is bulk action
     #[serde(rename = "isBulk")]
     pub is_bulk: bool,
+    /// if is_bulk, this field holds number of units affected by bulk action
     pub bulk_rowcount: Option<u64>,
-    #[serde(rename = "isShownInList", default = "default_bool")]
-    pub is_shown_in_list: bool,
-    #[serde(rename = "isShownInListEntry", default = "default_bool")]
-    pub is_shown_in_list_entry: bool,
-    #[serde(rename = "isSystemMessage", default = "default_bool")]
-    pub is_system_message: bool,
-    #[serde(rename = "originData")]
-    pub origin_data: Option<Value>, // Value::Object
-
+    //#[serde(rename = "isShownInList", default = "default_bool")]
+    //pub is_shown_in_list: bool, // unused
+    //#[serde(rename = "isShownInListEntry", default = "default_bool")]
+    //pub is_shown_in_list_entry: bool, // unused
+    //#[serde(rename = "isSystemMessage", default = "default_bool")]
+    //pub is_system_message: bool, // unused
+    //#[serde(rename = "originData")]
+    //pub origin_data: Option<Value>// unused
+    /// object describing what changed through this activity.
     #[serde(rename = "changedData")]
     pub changed_data: ElementChange,
 
+    /// element id of changed data
     #[serde(rename = "changedDataElementId")]
     pub changed_data_element_id: Option<ID>,
 
+    /// id of activity's subject, if it is a workspace
     #[serde(rename = "workspaceId")]
-    pub workspace_id: ID,
-    //#[serde(rename = "workspaceShortId")]
-    //pub workspace_short_id: ShortId,
+    pub workspace_id: Option<ID>,
+
+    /// short id of activity's subject, if it is a workspace
+    #[serde(rename = "workspaceShortId")]
+    pub workspace_short_id: Option<ShortId>,
+
+    /// uuid of activity's subject, if it is a workspace
     #[serde(rename = "workspaceUUID")]
-    pub workspace_uuid: UUID,
+    pub workspace_uuid: Option<UUID>,
+
+    /// name of activity's subject, if it's a workspace
     #[serde(rename = "workspaceName")]
-    pub workspace_name: String,
+    pub workspace_name: Option<String>,
+
+    // description of activity's subject, if it is a workspace
     //#[serde(rename = "workspaceDescription")]
     //pub workspace_description: String,
+    /// date activity's subject was deprecated, if it is a workspace
     #[serde(rename = "workspaceDeprecated_at")]
     pub workspace_deprecated_at: Option<DateString>,
 
+    ///
     #[serde(rename = "parentUUID")]
     pub parent_uuid: Option<UUID>,
 
+    /// id of activity's subject, if it is a list
     #[serde(rename = "listId")]
-    pub list_id: ID,
-    //#[serde(rename = "listShortId")]
-    //pub list_short_id: ShortId,
+    pub list_id: Option<ID>,
+
+    /// short id of activity's subject, if it is a list
+    #[serde(rename = "listShortId")]
+    pub list_short_id: Option<ShortId>,
+
+    /// uuid of activity's subject, if it is a list
     #[serde(rename = "listUUID")]
-    pub list_uuid: UUID,
+    pub list_uuid: Option<UUID>,
+    /// name of activity's subject, if it is a list
     #[serde(rename = "listName")]
-    pub list_name: String,
+    pub list_name: Option<String>,
+
     //#[serde(rename = "listDescription")]
-    //pub list_description: String,
+    //pub list_description: Option<String>,
+    /// date list deprecated
     #[serde(rename = "listDeprecated_at")]
     pub list_deprecated_at: Option<DateString>,
 
+    /// id of activity's subject, if it is a list entry
     #[serde(rename = "listEntryId")]
-    pub list_entry_id: ID,
+    pub list_entry_id: Option<ID>,
+
+    /// uuid of activity's subject, if it is a list entry
+    #[serde(rename = "listEntryUUID")]
+    pub list_entry_uuid: Option<UUID>,
+
     //#[serde(rename = "listEntryShortId")]
     //pub list_entry_short_id: ShortId,
-    //#[serde(rename = "listEntryName")]
-    //pub list_entry_name: String,
-    //#[serde(rename = "listEntryDescription")]
-    //pub list_entry_description: String,
+    /// name of activity's subject, if it is a list entry
+    #[serde(rename = "listEntryName")]
+    pub list_entry_name: Option<String>,
+    /// description of activity's subject, if it is a list entry
+    #[serde(rename = "listEntryDescription")]
+    pub list_entry_description: String,
+    /// date at which activity's subject was deprecated, if it is a list entry
     #[serde(rename = "listEntryDeprecated_at")]
     pub list_entry_deprecated_at: Option<DateString>,
 
-    /// Name of field updated.
-    /// For convenience, coercing null/None to empty string (can be null, for example, for comments)
-    #[serde(rename = "elementName", default = "empty_string")]
-    pub element_name: String,
+    /// Name of field updated. Can be None if activity is a Comment
+    #[serde(rename = "elementName")]
+    pub element_name: Option<String>,
 
     //#[serde(rename = "elementData")]
     //pub element_data: Element,
+    /// date activity created
     pub created_at: DateString,
+    /// date activity updated
     pub updated_at: DateString,
+    /// date activity deprecated
     pub deprecated_at: Option<DateString>,
 
+    /// user id this actiity belongs to
     #[serde(rename = "userId")]
     pub user_id: ID,
+    /// display name of activity's subject, if it is a user
     #[serde(rename = "userDisplayname")] // docs incorrectly calls it 'userDisplayName'
     pub user_display_name: String,
+    /// full name of activity's subject, if it is a user
     #[serde(rename = "userFullname")]
     pub user_full_name: String,
+    /// username of activity's subject, if it is a user
     #[serde(rename = "userUsername")]
     pub user_username: String,
+    /// user initials of the activity's subject, if it is a user
     #[serde(rename = "userInitials")]
     pub user_initials: String,
+    /// user image preference setting of the activity's subject, if it is a user
     #[serde(rename = "userIsImagePreferred")]
     pub user_is_image_preferred: bool,
     //#[serde(rename = "userImageLink")]
     //pub user_image_link: Option<bool>,
 }
 
+impl ZKObjectID for Activity {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// Original and new value
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangedValue<T> {
+    /// value before change
     pub value_from: Option<T>,
+    /// value after change
     pub value_to: Option<T>,
 }
 
+/// Selection of changed data
+pub enum FromTo {
+    /// Value before change
+    From,
+    /// Value after change
+    To,
+}
+
+impl<T> ChangedValue<T> {
+    fn get(&self, ft: FromTo) -> &Option<T> {
+        match ft {
+            FromTo::From => &self.value_from,
+            FromTo::To => &self.value_to,
+        }
+    }
+}
+
+/// Set of changed values
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangedArray<T> {
+    /// Values before change
     pub value_from: Vec<T>,
+    /// values after change
     pub value_to: Vec<T>,
+    /// values before change, in string representation
     pub value_from_as_strings: Vec<String>,
+    /// values after change, in string representation
     pub value_to_as_strings: Vec<String>,
+}
+
+impl<T> ChangedArray<T> {
+    fn get(&self, ft: FromTo) -> &Vec<T> {
+        match ft {
+            FromTo::From => &self.value_from,
+            FromTo::To => &self.value_to,
+        }
+    }
+    fn as_strings(&self, ft: FromTo) -> &Vec<String> {
+        match ft {
+            FromTo::From => &self.value_from_as_strings,
+            FromTo::To => &self.value_to_as_strings,
+        }
+    }
 }
 
 /// Value of date from or to
@@ -803,12 +1007,19 @@ pub struct DateValue {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum ChangedData {
+    /// change to text data
     Text(ChangedValue<String>),
+    /// change to numeric data
     Number(ChangedValue<f64>),
+    /// change to date field
     Date(ChangedValue<DateValue>),
+    /// change to label field
     Categories(ChangedArray<ID>),
+    /// change to person(s)
     Persons(ChangedArray<ID>),
+    /// change to reference(s)
     References(ChangedArray<UUID>),
+    /// change not covered by any of the other types
     Other(Value),
 }
 
@@ -820,19 +1031,19 @@ fn opt_to_string<T: ToString>(v: &Option<T>) -> String {
 }
 
 impl ChangedData {
-    /// helper to get printable from-value
-    pub fn from_as_string(&self) -> String {
+    /// Generate printable string value for from (previous) or to (new) value
+    pub fn val_to_string(&self, ft: FromTo) -> String {
         use crate::join;
         match self {
-            ChangedData::Text(sval) => opt_to_string(&sval.value_from),
-            ChangedData::Number(nval) => opt_to_string(&nval.value_from),
-            ChangedData::Date(dval) => match dval.value_from {
+            ChangedData::Text(txt_val) => opt_to_string(txt_val.get(ft)),
+            ChangedData::Number(num_val) => opt_to_string(num_val.get(ft)),
+            ChangedData::Date(date_val) => match date_val.get(ft) {
                 Some(DateValue {
-                    date: Some(ref d),
+                    date: Some(ref date),
                     end_date: _,
                     has_time: _,
                     duration: _,
-                }) => d.clone(),
+                }) => date.clone(),
                 Some(DateValue {
                     date: None,
                     end_date: _,
@@ -841,58 +1052,37 @@ impl ChangedData {
                 }) => "".to_string(),
                 None => "".to_string(),
             },
-            ChangedData::Categories(arr) => join(",", &arr.value_from_as_strings),
-            ChangedData::Persons(arr) => join(",", &arr.value_from_as_strings),
-            ChangedData::References(arr) => join(",", &arr.value_from),
-            ChangedData::Other(_) => "<value>".to_string(),
-        }
-    }
-
-    /// helper to get printable to-value
-    pub fn to_as_string(&self) -> String {
-        use crate::join;
-        match self {
-            ChangedData::Text(sval) => opt_to_string(&sval.value_to),
-            ChangedData::Number(nval) => opt_to_string(&nval.value_to),
-            ChangedData::Date(dval) => match dval.value_to {
-                Some(DateValue {
-                    date: Some(ref d),
-                    end_date: _,
-                    has_time: _,
-                    duration: _,
-                }) => d.clone(),
-                Some(DateValue {
-                    date: None,
-                    end_date: _,
-                    has_time: _,
-                    duration: _,
-                }) => "".to_string(),
-                None => "".to_string(),
-            },
-
-            ChangedData::Categories(arr) => join(",", &arr.value_to_as_strings),
-            ChangedData::Persons(arr) => join(",", &arr.value_to_as_strings),
-            ChangedData::References(arr) => join(",", &arr.value_to),
+            ChangedData::Categories(arr) => join(",", arr.as_strings(ft)),
+            ChangedData::Persons(arr) => join(",", arr.as_strings(ft)),
+            ChangedData::References(arr) => join(",", arr.get(ft)),
             ChangedData::Other(_) => "<value>".to_string(),
         }
     }
 }
 
+/// change of object field
 #[derive(Debug)]
 pub struct ElementChange {
+    /// field type
     pub category_id: Option<ElementCategoryId>,
+    /// data of changed field
     pub data: ChangedData,
 }
 
+///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewActivityElement {
+    /// element name
     pub name: String,
+    /// field type
     #[serde(rename = "elementCategory")]
     pub element_category: ElementCategoryId,
 }
 
+/// new comment
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewComment {
+    /// comment text
     pub message: String,
 }
 
@@ -933,6 +1123,7 @@ pub enum BackgroundStyle {
     Tile = 1,
 }
 
+/// Background theme and style
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Background {
@@ -957,16 +1148,27 @@ pub struct Background {
     pub preview_file_short_id: ShortId,
 }
 
+impl ZKObjectID for Background {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// item in a checklist
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChecklistItem {
+    /// true if item is checked
     pub checked: bool,
+    /// checklist item text
     pub text: String,
 }
 
+/// Checklist field
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Checklist {
+    /// checklist uuid
     pub uuid: Option<UUID>,
+    /// checklist name
     pub name: String,
     /// The content
     pub items: Vec<ChecklistItem>,
@@ -974,179 +1176,172 @@ pub struct Checklist {
     pub should_checked_items_be_hidden: bool,
 }
 
+/// user email info
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Email {
+    /// email object id
     pub id: ID,
+    /// email object short id
     #[serde(rename = "shortId")]
     pub short_id: ShortId,
+    /// email object uuid
     pub uuid: UUID,
+    /// email address
     pub email: String,
+    /// whether this is the primary email
     #[serde(rename = "isPrimary")]
     pub is_primary: bool,
+    /// date created
     pub created_at: String,
+    /// date updated
     pub updated_at: String,
+    /// date deprecated
     pub deprecated_at: Option<String>,
     #[serde(rename = "isVerified")]
+    /// whether email has been verified
     pub is_verified: bool,
 }
 
+impl ZKObjectID for Email {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
 /// List item
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Entry {
+    /// object id
     pub id: ID,
     #[serde(rename = "shortId")]
+    /// object short id
     pub short_id: ShortId,
+    /// object uuid
     pub uuid: UUID,
+    /// id of list containing this entry
     #[serde(rename = "listId")]
     pub list_id: ID,
+    /// entry created date
     pub created_at: String,
+    /// entry updated date
     pub updated_at: String,
+    /// entry deprecated date
     pub deprecated_at: Option<String>,
+    /// user that created entry
     pub created_by_displayname: Option<String>,
+    /// user that updated entry
     pub updated_by_displayname: Option<String>,
+    /// user that deprecated entry
     pub deprecated_by_displayname: Option<String>,
+    /// id of user that created entry
     pub created_by: ID,
+    /// id of user that updated entry
     pub updated_by: ID,
+    /// id of user that deprecated entry
     pub deprecated_by: Option<ID>,
+    /// Entry title
     // I encountered a null displayString after creating an Entry via api without specifying it
     // To simplify coding elsewhere, coerce (rare/unlikely) null to empty string
     #[serde(rename = "displayString", default = "empty_string")]
     pub display_string: String,
+    /// Sort order
     #[serde(rename = "sortOrder", deserialize_with = "f32_or_str")]
     pub sort_order: f32, // sometimes negative
+    /// number of comments
     pub comment_count: u64,
+    /// checklist items attached to this entry
     pub checklists: Vec<Checklist>,
-    /// User-defined fields (name_uuid, etc.) will go here
+    /// Catch-all: User-defined fields (name_uuid, etc.) will be here
     #[serde(flatten)]
     pub fields: JsonMap,
+}
+
+impl ZKObjectID for Entry {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
 }
 
 impl Entry {
     /// Returns value of text string or None if undefined
     pub fn get_text_value(&self, field_uuid: &str) -> Result<Option<&str>, Error> {
-        let fname = format!("{}_text", field_uuid);
+        let field_name = format!("{}_text", field_uuid);
         Ok(self
             .fields
-            .get(&fname)
+            .get(&field_name)
             .map(|v| v.as_str())
             .unwrap_or_default())
     }
 
     /// Returns int value of numeric field
     pub fn get_int_value(&self, field_uuid: &str) -> Result<Option<i64>, Error> {
-        let fname = format!("{}_number", field_uuid);
+        let field_name = format!("{}_number", field_uuid);
         Ok(self
             .fields
-            .get(&fname)
+            .get(&field_name)
             .map(|n| n.as_i64())
             .unwrap_or_default())
     }
 
     /// Returns float value of numeric field
     pub fn get_float_value(&self, field_uuid: &str) -> Result<Option<f64>, Error> {
-        let fname = format!("{}_number", field_uuid);
+        let field_name = format!("{}_number", field_uuid);
         Ok(self
             .fields
-            .get(&fname)
+            .get(&field_name)
             .map(|n| n.as_f64())
             .unwrap_or_default())
     }
 
     /// Returns value of date string or None if undefined
     pub fn get_date_value(&self, field_uuid: &str) -> Result<Option<&str>, Error> {
-        let fname = format!("{}_date", field_uuid);
+        let field_name = format!("{}_date", field_uuid);
         Ok(self
             .fields
-            .get(&fname)
+            .get(&field_name)
             .map(|v| v.as_str())
             .unwrap_or_default())
     }
 
-    /// Returns category value(s) (as strings)
+    /// Returns label/category value(s) (as strings)
     pub fn get_category_names(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
-        let fname = format!("{}_categories_sort", field_uuid);
-        Ok(self
-            .fields
-            .get(&fname)
-            .map(|v| v.as_array())
-            .unwrap_or_default()
-            .map(|v| {
-                v.iter()
-                    .filter_map(|val| val.as_object())
-                    .filter_map(|val| val.get("name"))
-                    .filter_map(|val| val.as_str())
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new))
+        self.map_values(field_uuid, "categories_sort", "name", |v| v.as_str())
     }
 
-    /// Returns category ids
+    /// Returns label/category ids
     pub fn get_category_ids(&self, field_uuid: &str) -> Result<Vec<ID>, Error> {
-        let fname = format!("{}_categories_sort", field_uuid);
-        Ok(self
-            .fields
-            .get(&fname)
-            .map(|v| v.as_array())
-            .unwrap_or_default()
-            .map(|v| {
-                v.iter()
-                    .filter_map(|val| val.as_object())
-                    .filter_map(|val| val.get("id"))
-                    .filter_map(|val| val.as_u64())
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new))
+        self.map_values(field_uuid, "categories_sort", "id", |v| v.as_u64())
     }
 
-    /// Returns display names of people or empty array if no people (or invalid field)
+    //noinspection SpellCheckingInspection
+    /// Returns display names of people referenced by this field
     pub fn get_person_names(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
-        let fname = format!("{}_persons_sort", field_uuid);
-        Ok(self
-            .fields
-            .get(&fname)
-            .map(|v| v.as_array())
-            .unwrap_or_default()
-            .map(|v| {
-                v.iter()
-                    .filter_map(|val| val.as_object())
-                    .filter_map(|val| val.get("displayname"))
-                    .filter_map(|val| val.as_str())
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new))
+        self.map_values(field_uuid, "persons_sort", "displayname", |v| v.as_str())
     }
 
-    /// Returns IDs of people or empty array if no people (or invalid field)
+    /// Returns IDs of people referenced by this field
     pub fn get_person_ids(&self, field_uuid: &str) -> Result<Vec<ID>, Error> {
-        let fname = format!("{}_persons_sort", field_uuid);
-        Ok(self
-            .fields
-            .get(&fname)
-            .map(|v| v.as_array())
-            .unwrap_or_default()
-            .map(|v| {
-                v.iter()
-                    .filter_map(|val| val.as_object())
-                    .filter_map(|val| val.get("id"))
-                    .filter_map(|val| val.as_u64())
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new))
+        self.map_values(field_uuid, "persons_sort", "id", |v| v.as_u64())
     }
 
     /// Returns UUIDs of referent items, or empty array
     pub fn get_references(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
-        let fname = format!("{}_references_sort", field_uuid);
+        self.map_values(field_uuid, "references_sort", "uuid", |v| v.as_str())
+    }
+
+    // obtain Vec<value> from array of maps of key-value
+    fn map_values<'v, T>(&'v self, field_uuid: &'_ str, field_kind: &'_ str,  key: &'_ str, pred: fn(&'v Value)->Option<T>) -> Result<Vec<T>, Error>
+    {
+        let field_name = format!("{}_{}", field_uuid, field_kind);
         Ok(self
             .fields
-            .get(&fname)
+            .get(&field_name)
             .map(|v| v.as_array())
             .unwrap_or_default()
             .map(|v| {
                 v.iter()
                     .filter_map(|val| val.as_object())
-                    .filter_map(|val| val.get("uuid"))
-                    .filter_map(|val| val.as_str())
+                    .filter_map(|val| val.get(key))
+                    .filter_map(|val| pred(val))
                     .collect()
             })
             .unwrap_or_else(Vec::new))
@@ -1157,83 +1352,134 @@ impl Entry {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteListEntryDetail {
+    /// object id
     pub id: ID,
+    /// object uuid
     pub uuid: UUID,
+    /// object short id
     pub short_id: ShortId,
+}
+
+impl ZKObjectID for DeleteListEntryDetail {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
 }
 
 /// Response from delete entry
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteListEntryResponse {
+    ///
     pub action: String,
+    ///
     pub list_entry: DeleteListEntryDetail,
 }
 
 /// File attachment
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, Debug)]
 pub struct File {
+    /// object id
     pub id: ID,
+    /// object short id
     #[serde(rename = "shortId")]
     pub short_id: ShortId,
+    /// object uuid
     pub uuid: UUID,
+    /// file name
     #[serde(rename = "fileName")]
     pub file_name: String,
+    /// file size
     pub size: Option<i64>,
+    /// file mime type
     #[serde(rename = "mimetype")]
     pub mime_type: Option<String>,
+    /// image flag
     #[serde(rename = "isImage")]
     pub is_image: Option<bool>, //can be null
+    /// AWS S3 identity
     #[serde(rename = "s3key")]
     pub s3_key: Option<String>,
+    /// file url
     #[serde(rename = "fileUrl")]
     pub file_url: Option<String>,
+    /// crop parameters
     #[serde(rename = "cropParams")]
     pub crop_params: Value,
     // I uploaded an image and both height and width were null
     // their size was in metadata.height, metadata.width
     //pub width: Option<String>,
     //pub height: Option<String>,
+    /// date created
     pub created_at: String,
+    /// date updated
     pub updated_at: String,
+    /// date deprecated
     pub deprecated_at: Option<String>,
+    /// user that uploaded
     #[serde(rename = "uploaderId")]
     pub uploader_id: ID,
+    /// containing list
     #[serde(rename = "listId")]
     pub list_id: ID,
+    /// field id
     #[serde(rename = "elementId")]
     pub element_id: ID,
+    /// queries
     #[serde(rename = "cachedQuerys")]
     pub cached_queries: Value, // note spelling change
+    /// error during import
     #[serde(rename = "importError")]
     pub import_error: Option<String>,
-    // undocumented field "provider"
-    // None for uploads; "Link" for url type, ...
+    /// file provider: link for url type, None for uploads (undocumented)
     pub provider: Option<String>,
     /// undocumented field "metadata"
     /// for jpeg: {format: "jpeg", height: number, width: number}
     pub metadata: Option<Value>,
 }
 
+impl ZKObjectID for File {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// Filter expression term
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum FilterTermModus {
+    /// empty field
     IsEmpty,
+    /// non-empty field
     IsNotEmpty,
+    /// field contains text
     Contains,
+    /// field does not contain text
     NotContains,
+    /// field equals text
     Equals,
+    /// field does ot equal text
     NotEquals,
+    /// field starts with text
     StartsWith,
+    /// field does not start with text
     NotStartsWith,
+    /// field ends with text
     EndsWith,
+    /// field does not end with text
     NotEndsWith,
+    /// field has value within range
     InRange,
+    /// field value is not within range
     NotInRange,
+    /// field is greater or equal to value
     GreaterOrEqual,
+    /// field is less than or equal to value
     LessOrEqual,
 }
 
+/// date expression term
+//noinspection SpellCheckingInspection
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum DateFilterTermModus {
@@ -1255,54 +1501,83 @@ pub enum DateFilterTermModus {
     NotEmpty = 15,
 }
 
-/// List (aka Collection)
+/// List (aka Collection).
+/// See also ListInfo, which wraps a List with field definitions,
+/// to provide getters and setters for user-defined fields
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct List {
+    /// object id
     pub id: ID, // List ID
+    /// object short id
     #[serde(rename = "shortId")]
     pub short_id: ShortId,
+    /// object uuid
     pub uuid: UUID,
-    /// Title
+    /// list name / title
     #[serde(default)]
     pub name: String,
+    /// optional name for list item (defaults to list name)
     #[serde(rename = "itemName")]
     pub item_name: Option<String>,
+    /// optional plural name for list item (defaults to list name)
     #[serde(rename = "itemNamePlural")]
     pub item_name_plural: Option<String>,
+    ///
     #[serde(rename = "isBuilding")]
     pub is_building: bool,
+    ///
     #[serde(rename = "isMigrating")]
     pub is_migrating: bool,
     //#[serde(rename = "isPublic")]
     //pub is_public: bool, // undocumented
+    /// list sort order
     #[serde(rename = "sortOrder", deserialize_with = "f32_or_str")]
     pub sort_order: f32,
+    /// description of list
     pub description: String,
+    ///
     #[serde(rename = "formulaTSortOrder")]
     pub formula_tsort_order: Option<String>,
+    ///
     #[serde(rename = "listFilePolicy")]
     pub list_file_policy: Option<String>,
+    ///
     #[serde(rename = "originProvider")]
     pub origin_provider: Option<String>,
+    ///
     #[serde(rename = "originData")]
     pub origin_data: Option<Value>,
+    ///
     #[serde(rename = "defaultViewModus")]
     pub default_view_modus: i64,
+    /// date list created
     pub created_at: DateString,
+    /// date list last updated
     pub updated_at: DateString,
+    /// date list deprecated
     pub deprecated_at: Option<DateString>,
+    ///
     pub origin_created_at: Option<DateString>,
+    ///
     pub origin_updated_at: Option<DateString>,
+    ///
     pub origin_deprecated_at: Option<DateString>,
     #[serde(rename = "workspaceId")]
+    /// id of workspace containing list
     pub workspace_id: ID,
     #[serde(rename = "backgroundId")]
+    ///
     pub background_id: Option<String>,
+    ///
     pub visibility: i64,
+    ///
     #[serde(rename = "iconColor")]
     pub icon_color: Option<String>, // undocumented
+    ///
     #[serde(rename = "iconBackgroundColor")]
     pub icon_background_color: Option<String>, // undocumented
+    /// id of user that created list
     pub created_by: ID,
     //pub settings: Option<Value>, // undocumented
     //#[serde(rename = "resourceTags")]
@@ -1313,8 +1588,10 @@ pub struct List {
     //pub icon_class_names: Option<Value>, // undocumented
 }
 
-unsafe impl Send for List {}
-unsafe impl Sync for List {}
+impl ZKObjectID for List {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
 
 impl List {
     /// Returns true if the list has the id, uuid, shortId, or name of the parameter
@@ -1329,6 +1606,7 @@ impl fmt::Display for List {
     }
 }
 
+/// prototype
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListPrototype {
     /// list name
@@ -1366,6 +1644,8 @@ pub struct MinNotification {
     pub activity_id: ID,
 }
 
+/// User profile data
+//noinspection SpellCheckingInspection
 #[derive(Serialize, Deserialize, Debug)]
 pub struct User {
     pub id: ID,
@@ -1399,14 +1679,26 @@ pub struct User {
     // pub emails: Vec<Email>,
 }
 
+impl ZKObjectID for User {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
+
+/// Workspace
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Workspace {
+    /// workspace id
     pub id: ID,
+    /// workspace short id
     #[serde(rename = "shortId")]
     pub short_id: ShortId,
+    /// workspace uuid
     pub uuid: UUID,
+    /// workspace name
     pub name: String,
+    /// workspace description
     pub description: Option<String>,
+    /// whether this is user's default workspace
     #[serde(rename = "isDefault")]
     pub is_default: bool,
     /// The timestamp at which this element was created
@@ -1415,10 +1707,13 @@ pub struct Workspace {
     pub updated_at: String,
     /// The timestamp at which this element was deprecated. Is null if not deprecated
     pub deprecated_at: Option<String>,
+    /// workspace background theme
     #[serde(rename = "backgroundId")]
     pub background_id: Option<ID>,
+    /// workspace creator user id
     pub created_by: ID,
 
+    /// lists in workspace
     pub lists: Vec<List>,
     // undocumented fields seen in output
     //#[serde(rename = "resourceTags")]
@@ -1427,8 +1722,11 @@ pub struct Workspace {
     //#[serde(rename = "app_data")]
     //pub app_data: Value,
 }
-unsafe impl Send for Workspace {}
-unsafe impl Sync for Workspace {}
+
+impl ZKObjectID for Workspace {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
+}
 
 impl Workspace {
     /// Returns the workspace description, or an empty string if none was provided
@@ -1515,6 +1813,7 @@ impl std::str::FromStr for TextFormat {
     }
 }
 
+/// Webhook trigger
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug)]
 #[repr(u8)]
 pub enum WebhookTriggerType {
@@ -1526,6 +1825,7 @@ pub enum WebhookTriggerType {
     Element = 5,
 }
 
+/// Webhook definition
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Webhook {
@@ -1542,6 +1842,11 @@ pub struct Webhook {
     pub provider: Option<String>,
     pub locale: String,
     pub element_id: Option<ID>,
+}
+
+impl ZKObjectID for Webhook {
+    fn get_id(&self) -> ID { self.id }
+    fn get_uuid(&self) -> &UUID { &self.uuid }
 }
 
 /// Parameter for creating a new webhook
@@ -1564,6 +1869,7 @@ pub struct NewWebhook {
     pub locale: String,
 }
 
+/// Application OAuth client configuration
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthClient {
@@ -1575,6 +1881,7 @@ pub struct OAuthClient {
     pub redirect_uri: String,
 }
 
+/// OAuth response data
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthResponse {
@@ -1590,6 +1897,7 @@ pub struct SharedAccesses {
     pub workspace_ids: Vec<ID>,
 }
 
+/// Type of data change
 #[derive(Serialize, Deserialize, PartialEq, Debug, Copy, Clone)]
 #[serde(rename = "lowercase")]
 pub enum UpdateAction {
@@ -1636,11 +1944,12 @@ impl ElementChange {
     /// Most of the parsing logic is devoted to handling ResourceUpdate - activity type 2.
     /// For other activity types (for example, Comment, New Item, etc.)
     /// return the data as ChangedData::Other(Value).
+    //noinspection SpellCheckingInspection
     fn from(mut v: Value) -> Result<Self, Error> {
         use ElementCategoryId::{Categories, Number, Persons, References, Text};
         if let Some(map) = v.as_object_mut() {
-            if let Some(cval) = map.values_mut().take(1).next() {
-                let category_id: ElementCategoryId = match cval
+            if let Some(change_val) = map.values_mut().take(1).next() {
+                let category_id: ElementCategoryId = match change_val
                     .get("elementcategoryId")
                     .map(|n| n.as_u64())
                     .unwrap_or_default()
@@ -1653,22 +1962,16 @@ impl ElementChange {
                             category_id: None,
                             data: ChangedData::Other(v),
                         });
-                        /*
-                        return Err(Error::Other(format!(
-                            "missing elementcategoryId. raw={:?}",
-                            &v
-                        )))
-                        */
                     }
                 };
-                let cval = cval.take();
+                let change_val = change_val.take();
                 let data = match category_id {
-                    Text => ChangedData::Text(serde_json::from_value(cval)?),
-                    Number => ChangedData::Number(serde_json::from_value(cval)?),
-                    Persons => ChangedData::Persons(serde_json::from_value(cval)?),
-                    References => ChangedData::References(serde_json::from_value(cval)?),
-                    Categories => ChangedData::Categories(serde_json::from_value(cval)?),
-                    ElementCategoryId::Date => ChangedData::Date(serde_json::from_value(cval)?),
+                    Text => ChangedData::Text(serde_json::from_value(change_val)?),
+                    Number => ChangedData::Number(serde_json::from_value(change_val)?),
+                    Persons => ChangedData::Persons(serde_json::from_value(change_val)?),
+                    References => ChangedData::References(serde_json::from_value(change_val)?),
+                    Categories => ChangedData::Categories(serde_json::from_value(change_val)?),
+                    ElementCategoryId::Date => ChangedData::Date(serde_json::from_value(change_val)?),
                     // not yet implemented
                     ElementCategoryId::URL
                     | ElementCategoryId::Checkbox
@@ -1686,7 +1989,7 @@ impl ElementChange {
                         // for unimplemented categories, use None to signal value needs to be decoded
                         return Ok(ElementChange {
                             category_id: None,
-                            data: ChangedData::Other(cval),
+                            data: ChangedData::Other(change_val),
                         });
                     }
                 };

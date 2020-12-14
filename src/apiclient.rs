@@ -1,4 +1,4 @@
-use crate::{types::*, Error, ListInfo, Result, UserCache};
+use crate::{types::*, Error, UserCache};
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Response,
@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 
 const DEFAULT_ENDPOINT: &str = "https://zenkit.com/api/v1";
 const API_TOKEN_ENV_VAR: &str = "ZENKIT_API_TOKEN";
-/// Zenkit API client in Rust
+/// Zenkit http/API client
 #[derive(Debug)]
 pub struct ApiClient {
     client: reqwest::Client,
@@ -39,7 +39,7 @@ impl Default for ApiConfig {
     }
 }
 
-// generate user-agent header value from package version in the form "zenkit-rs 1.0.0"
+// generate user-agent header value from package version in the form "zenkit rs x.y.z"
 fn user_agent_header() -> HeaderValue {
     let agent = &format!(
         "{} rs {}",
@@ -88,11 +88,6 @@ impl ApiClient {
     /// Not yet implemented
     pub fn get_rate_limit_remaining(&self) -> Option<u32> {
         self.ratelimit_remaining
-    }
-
-    /// Returns http client - Temporary for testing
-    pub fn get_http(&self) -> &reqwest::Client {
-        &self.client
     }
 
     /// Check response for http errors and deserialize to requested object type.

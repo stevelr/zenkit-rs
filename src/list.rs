@@ -3,10 +3,10 @@
 
 use crate::{
     types::{
-        AllId, ElementCategoryId, Entry, Field, GetEntriesRequest, JsonMap, List, NumericType,
-        TextFormat, UpdateAction, ID, UUID,
+        AllId, ElementCategoryId, Entry, Field, GetEntriesRequest, Item, JsonMap, List,
+        NumericType, TextFormat, UpdateAction, ID, UUID,
     },
-    Error, Item, Result,
+    Error,
 };
 use serde_json::{json, Value};
 use std::{fmt, iter::Iterator, rc::Rc, string::ToString};

@@ -1,47 +1,5 @@
-use crate::{Error, Result};
 use serde::de::{Deserializer, Visitor};
-use std::{fmt, io::Write};
-
-const TRACE_OUTPUT: &str = "/tmp";
-
-/*
-/// Logging level for debug output
-#[derive(PartialEq, Debug)]
-pub enum LogLevel {
-    /// Info level, the default level
-    Info,
-    /// Debug level - additional verbosity
-    Debug,
-    /// Trace level - logs all messages
-    Trace,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Info
-    }
-}
-
-impl FromStr for LogLevel {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "info" | "Info" | "INFO" => Ok(LogLevel::Info),
-            "debug" | "Debug" | "DEBUG" => Ok(LogLevel::Debug),
-            "trace" | "Trace" | "TRACE" => Ok(LogLevel::Trace),
-            _ => Err(Error::ParseError(format!("Invalid loglevel: {}", s))),
-        }
-    }
-}
-*/
-
-/// write json object to log file (in trace mode)
-pub fn log_object(tstamp: &str, name: &str, data: &[u8]) -> Result<String, Error> {
-    let fname = format!("{}/log_{}_{}.json", TRACE_OUTPUT, tstamp, name);
-    let mut file = std::fs::File::create(&fname)?;
-    file.write_all(data)?;
-    Ok(fname)
-}
+use std::fmt;
 
 /// Deserializer for value that can be an int, float, or string
 // I've seen sortOrder in Entry objects returned
@@ -64,15 +22,11 @@ impl<'de> Visitor<'de> for AnyF32Visitor {
         formatter.write_str("an i64 integer or string representation of i64")
     }
 
-    fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(v as f32)
-    }
-
-    fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
-        Ok(v as f32)
-    }
-
     fn visit_i32<E: serde::de::Error>(self, v: i32) -> Result<Self::Value, E> {
+        Ok(v as f32)
+    }
+
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
         Ok(v as f32)
     }
 
@@ -80,11 +34,15 @@ impl<'de> Visitor<'de> for AnyF32Visitor {
         Ok(v as f32)
     }
 
-    fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
         Ok(v as f32)
     }
 
     fn visit_f32<E: serde::de::Error>(self, v: f32) -> Result<Self::Value, E> {
+        Ok(v as f32)
+    }
+
+    fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
         Ok(v as f32)
     }
 

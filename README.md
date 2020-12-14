@@ -1,13 +1,12 @@
-Rust client library for reading and updating Zenkit workspaces
+Zenkit client library in Rust with caching. Supports
+most types and functions of the documented Zenkit REST API, plus helper functions
+that make it easier to read, update, and create list items. This library
+has been used to make client and server apps, WASM libraries, and webhooks.
 
 Documentation is at [docs.rs](https://docs.rs/zenkit).
-Also see the official reference at [Zenkit API docs](https://base.zenkit.com/docs/api/overview/introduction)
+Official reference at [Zenkit API docs](https://base.zenkit.com/docs/api/overview/introduction)
 
-This library has been used for native apps and web apps,
-and has been used to implement Zenkit Webhooks 
-in WASM on Cloudflare Workers using [wasm-service].
-
-## Code generation
+## Rust source-code generation
 
 If you are writing a Rust client for Zenkit, check out
 [zk-codegen](https://github.com/stevelr/zenkit-codegen),
@@ -18,6 +17,6 @@ with an API derived from the lists and fields defined in your workspace.
 
 [zenkit-cli](https://github.com/stevelr/zenkit-cli) has command-line
 capabilities that may be useful for testing and automation.
-It also can serve as example code for most of the functions
+It may also be useful to view as example code for many of the functions
 in this library.
 

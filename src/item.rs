@@ -1,14 +1,13 @@
 use crate::{
     types::{Entry, Field, ID, UUID},
-    Error, Result,
+    Error,
 };
 use std::{
-    //default::Default,
     iter::Iterator,
     string::ToString,
 };
 
-/// Item in a list
+/// Item in a list. Wrapper for Entry that includes field getters for business values.
 #[derive(Debug)]
 pub struct Item<'li> {
     entry: Entry,
@@ -33,12 +32,12 @@ impl<'li> Item<'li> {
         }
     }
 
-    /// returns reference to the inner entry
+    /// Returns reference to the inner entry. Also available with deref.
     pub fn as_entry(&self) -> &Entry {
         &self.entry
     }
 
-    /// return entry id
+    /// Return entry id
     pub fn get_id(&self) -> ID {
         self.entry.id
     }
@@ -66,23 +65,6 @@ impl<'li> Item<'li> {
     pub fn get_text_value(&self, fname: &str) -> Result<Option<&str>, Error> {
         self.get_field(fname)
             .map(|field| self.entry.get_text_value(&field.uuid))?
-    }
-
-    /// If text field is defined, returns owned string
-    /// This can be useful to avoid memory allocation if the string field is expected to be large
-    pub fn take_text_value(&mut self, fname: &str) -> Option<String> {
-        let fname = format!(
-            "{}_text",
-            match self.get_field(fname) {
-                Ok(u) => &u.uuid,
-                Err(_) => return None,
-            }
-        );
-        if let Some(serde_json::Value::String(s)) = self.entry.fields.remove(&fname) {
-            Some(s)
-        } else {
-            None
-        }
     }
 
     /// Returns value of integer field as i64. or None if not defined
