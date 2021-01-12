@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 
 const DEFAULT_ENDPOINT: &str = "https://zenkit.com/api/v1";
 const API_TOKEN_ENV_VAR: &str = "ZENKIT_API_TOKEN";
+
 /// Zenkit http/API client
 #[derive(Debug)]
 pub struct ApiClient {
@@ -23,6 +24,10 @@ pub struct ApiClient {
 }
 
 /// Initialization parameters for Zenkit Api client
+/// ```rust
+/// use zenkit::{init_api,ApiConfig};
+/// let api = init_api(ApiConfig::default()).unwrap();
+/// ```
 pub struct ApiConfig {
     /// Secret API Token. Default value is from environment: ZENKIT_API_TOKEN
     pub token: String,
@@ -56,6 +61,22 @@ impl ApiClient {
     /// Error if token is non-ascii
     pub(crate) fn new(config: ApiConfig) -> Result<Self, Error> {
         use reqwest::header::{CONTENT_TYPE, USER_AGENT};
+        if config.token.is_empty() {
+            let env_is_set = match std::env::var(API_TOKEN_ENV_VAR) {
+                Ok(s) => !s.is_empty(),
+                Err(_) => false,
+            };
+            let msg = match env_is_set {
+                false => format!(
+                    "Missing API token. Do you need to set the environment variable '{}'?",
+                    API_TOKEN_ENV_VAR
+                ),
+                true => "Missing API token. The token is needed as a parameter to ApiClient::new()"
+                    .to_string(),
+                // couldn't tell if env is set
+            };
+            return Err(Error::MissingAPIToken(msg));
+        }
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.insert(USER_AGENT, user_agent_header());
@@ -106,6 +127,11 @@ impl ApiClient {
         if !status.is_success() {
             // attempt to parse response as Zenkit error
             if let Ok(err_res) = serde_json::from_slice::<ErrorResult>(&bytes) {
+                //   should we use error message in lookup table, i.e.:
+                //       if let Some(message) = crate::lookup_error(err_res.error.code) ...
+                //   - no, if the error provided is more descriptive
+                //   - yes, if the error provided is in a different language
+                //   For now, just use the message provided
                 return Err(Error::ApiError(status.as_u16(), Some(err_res.error)));
             }
             return Err(Error::Other(format!(
@@ -476,7 +502,7 @@ impl ApiClient {
             }
         };
         // load fields
-        let fields = crate::get_api()?.get_list_elements(list.id).await?;
+        let fields = self.get_list_elements(list.id).await?;
 
         let info = Arc::new(ListInfo::new(list, fields));
         let mut list_cache_write = self.lists.write()?;

@@ -16,9 +16,10 @@
 //!   Serde rules are used to map to/from the json-defined names on a per-field/per-struct basis
 //! All color fields use 'color' (no _hex suffix)
 //! Whenever I felt fairly confident that a type could be made more specific, I did so
-//!   (String -> UUID, int -> ID, String -> DateString), etc.
+//!   (String -> UUID, int -> ID, String -> DateTime<Utc>), etc.
 
 use crate::{f32_or_str, Error};
+pub use chrono::{DateTime, Utc};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -41,8 +42,6 @@ pub type ID = u64;
 pub type ShortId = String; // 7-14 chars, includes at least 1 letter, may include '-'
 /// Zenkit-assigned object UUID
 pub type UUID = String; // RFC 4122
-/// Date
-pub type DateString = String; // ISO8601
 /// Error code returned from zenkit api calls. See https://base.zenkit.com/docs/api/type/errorcode
 pub type ErrorCode = String;
 
@@ -78,7 +77,6 @@ pub enum AllId {
 
 /// Zenkit object with ID and UUID
 pub trait ZKObjectID {
-
     /// Returns the zenkit-assigned ID (positive int)
     fn get_id(&self) -> ID;
 
@@ -134,11 +132,11 @@ impl From<&'_ str> for AllId {
     }
 }
 
-impl Into<String> for AllId {
-    fn into(self) -> String {
-        self.to_string()
-    }
-}
+//impl Into<String> for AllId {
+//    fn into(self) -> String {
+//       self.to_string()
+//    }
+//}
 
 /// Sort direction
 #[derive(Serialize, Deserialize, Debug)]
@@ -220,11 +218,11 @@ pub struct PredefinedCategory {
     #[serde(rename = "colorHex")]
     pub color: String,
     /// date created
-    pub created_at: DateString,
+    pub created_at: DateTime<Utc>,
     /// date updated
-    pub updated_at: DateString,
+    pub updated_at: DateTime<Utc>,
     /// date deprecated
-    pub deprecated_at: Option<DateString>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     /// element(field) id
     #[serde(rename = "elementId")]
     pub element_id: ID,
@@ -245,8 +243,12 @@ pub struct PredefinedCategory {
 }
 
 impl ZKObjectID for PredefinedCategory {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Embedded list, if accessible
@@ -266,7 +268,7 @@ pub struct NoAccessList {
     #[serde(rename = "ACCESS_DENIED")]
     pub access_denied: bool,
     /// list is deprecated
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     /// list name
     pub name: String,
     /// list uuid
@@ -518,7 +520,7 @@ pub struct Access {
     /// Access role
     #[serde(rename = "roleId")]
     pub role_id: RoleID,
-    pub created_at: Option<DateString>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -596,7 +598,7 @@ pub struct ElementCategory {
     pub element_data_defaults: Value,
     #[serde(rename = "created_at")]
     /// The timestamp at which this element category was created
-    pub created_at: DateString,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Field definition
@@ -636,11 +638,11 @@ pub struct Element {
     pub sort_order: f32,
     pub visible: bool,
     /// The timestamp at which this element was created
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// The timestamp at which this element was last updated
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
     /// The timestamp at which this element was deprecated. Is null if not deprecated
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     #[serde(rename = "elementcategory")]
     /// The element category
     pub element_category: ElementCategoryId,
@@ -699,8 +701,12 @@ impl Element {
 }
 
 impl ZKObjectID for Element {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Type of numeric field
@@ -845,7 +851,7 @@ pub struct Activity {
     //pub workspace_description: String,
     /// date activity's subject was deprecated, if it is a workspace
     #[serde(rename = "workspaceDeprecated_at")]
-    pub workspace_deprecated_at: Option<DateString>,
+    pub workspace_deprecated_at: Option<DateTime<Utc>>,
 
     ///
     #[serde(rename = "parentUUID")]
@@ -870,7 +876,7 @@ pub struct Activity {
     //pub list_description: Option<String>,
     /// date list deprecated
     #[serde(rename = "listDeprecated_at")]
-    pub list_deprecated_at: Option<DateString>,
+    pub list_deprecated_at: Option<DateTime<Utc>>,
 
     /// id of activity's subject, if it is a list entry
     #[serde(rename = "listEntryId")]
@@ -890,7 +896,7 @@ pub struct Activity {
     pub list_entry_description: String,
     /// date at which activity's subject was deprecated, if it is a list entry
     #[serde(rename = "listEntryDeprecated_at")]
-    pub list_entry_deprecated_at: Option<DateString>,
+    pub list_entry_deprecated_at: Option<DateTime<Utc>>,
 
     /// Name of field updated. Can be None if activity is a Comment
     #[serde(rename = "elementName")]
@@ -899,11 +905,11 @@ pub struct Activity {
     //#[serde(rename = "elementData")]
     //pub element_data: Element,
     /// date activity created
-    pub created_at: DateString,
+    pub created_at: DateTime<Utc>,
     /// date activity updated
-    pub updated_at: DateString,
+    pub updated_at: DateTime<Utc>,
     /// date activity deprecated
-    pub deprecated_at: Option<DateString>,
+    pub deprecated_at: Option<DateTime<Utc>>,
 
     /// user id this actiity belongs to
     #[serde(rename = "userId")]
@@ -928,8 +934,12 @@ pub struct Activity {
 }
 
 impl ZKObjectID for Activity {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Original and new value
@@ -1149,8 +1159,12 @@ pub struct Background {
 }
 
 impl ZKObjectID for Background {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// item in a checklist
@@ -1192,19 +1206,23 @@ pub struct Email {
     #[serde(rename = "isPrimary")]
     pub is_primary: bool,
     /// date created
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// date updated
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
     /// date deprecated
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     #[serde(rename = "isVerified")]
     /// whether email has been verified
     pub is_verified: bool,
 }
 
 impl ZKObjectID for Email {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// List item
@@ -1222,11 +1240,11 @@ pub struct Entry {
     #[serde(rename = "listId")]
     pub list_id: ID,
     /// entry created date
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// entry updated date
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
     /// entry deprecated date
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     /// user that created entry
     pub created_by_displayname: Option<String>,
     /// user that updated entry
@@ -1257,8 +1275,12 @@ pub struct Entry {
 }
 
 impl ZKObjectID for Entry {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 impl Entry {
@@ -1303,36 +1325,41 @@ impl Entry {
     }
 
     /// Returns label/category value(s) (as strings)
-    pub fn get_category_names(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
+    pub fn get_category_names(&self, field_uuid: &str) -> Vec<&str> {
         self.map_values(field_uuid, "categories_sort", "name", |v| v.as_str())
     }
 
     /// Returns label/category ids
-    pub fn get_category_ids(&self, field_uuid: &str) -> Result<Vec<ID>, Error> {
+    pub fn get_category_ids(&self, field_uuid: &str) -> Vec<ID> {
         self.map_values(field_uuid, "categories_sort", "id", |v| v.as_u64())
     }
 
     //noinspection SpellCheckingInspection
     /// Returns display names of people referenced by this field
-    pub fn get_person_names(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
+    pub fn get_person_names(&self, field_uuid: &str) -> Vec<&str> {
         self.map_values(field_uuid, "persons_sort", "displayname", |v| v.as_str())
     }
 
     /// Returns IDs of people referenced by this field
-    pub fn get_person_ids(&self, field_uuid: &str) -> Result<Vec<ID>, Error> {
+    pub fn get_person_ids(&self, field_uuid: &str) -> Vec<ID> {
         self.map_values(field_uuid, "persons_sort", "id", |v| v.as_u64())
     }
 
     /// Returns UUIDs of referent items, or empty array
-    pub fn get_references(&self, field_uuid: &str) -> Result<Vec<&str>, Error> {
+    pub fn get_references(&self, field_uuid: &str) -> Vec<&str> {
         self.map_values(field_uuid, "references_sort", "uuid", |v| v.as_str())
     }
 
     // obtain Vec<value> from array of maps of key-value
-    fn map_values<'v, T>(&'v self, field_uuid: &'_ str, field_kind: &'_ str,  key: &'_ str, pred: fn(&'v Value)->Option<T>) -> Result<Vec<T>, Error>
-    {
+    fn map_values<'v, T>(
+        &'v self,
+        field_uuid: &'_ str,
+        field_kind: &'_ str,
+        key: &'_ str,
+        pred: fn(&'v Value) -> Option<T>,
+    ) -> Vec<T> {
         let field_name = format!("{}_{}", field_uuid, field_kind);
-        Ok(self
+        self
             .fields
             .get(&field_name)
             .map(|v| v.as_array())
@@ -1344,7 +1371,7 @@ impl Entry {
                     .filter_map(|val| pred(val))
                     .collect()
             })
-            .unwrap_or_else(Vec::new))
+            .unwrap_or_else(Vec::new)
     }
 }
 
@@ -1361,8 +1388,12 @@ pub struct DeleteListEntryDetail {
 }
 
 impl ZKObjectID for DeleteListEntryDetail {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Response from delete entry
@@ -1411,11 +1442,11 @@ pub struct File {
     //pub width: Option<String>,
     //pub height: Option<String>,
     /// date created
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// date updated
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
     /// date deprecated
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     /// user that uploaded
     #[serde(rename = "uploaderId")]
     pub uploader_id: ID,
@@ -1439,8 +1470,12 @@ pub struct File {
 }
 
 impl ZKObjectID for File {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Filter expression term
@@ -1552,17 +1587,17 @@ pub struct List {
     #[serde(rename = "defaultViewModus")]
     pub default_view_modus: i64,
     /// date list created
-    pub created_at: DateString,
+    pub created_at: DateTime<Utc>,
     /// date list last updated
-    pub updated_at: DateString,
+    pub updated_at: DateTime<Utc>,
     /// date list deprecated
-    pub deprecated_at: Option<DateString>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     ///
-    pub origin_created_at: Option<DateString>,
+    pub origin_created_at: Option<DateTime<Utc>>,
     ///
-    pub origin_updated_at: Option<DateString>,
+    pub origin_updated_at: Option<DateTime<Utc>>,
     ///
-    pub origin_deprecated_at: Option<DateString>,
+    pub origin_deprecated_at: Option<DateTime<Utc>>,
     #[serde(rename = "workspaceId")]
     /// id of workspace containing list
     pub workspace_id: ID,
@@ -1582,15 +1617,19 @@ pub struct List {
     //pub settings: Option<Value>, // undocumented
     //#[serde(rename = "resourceTags")]
     //pub resource_tags: Vec<ResourceTag>, // undocumented
-    //     { appType: String, created_at: DateString, created_by: ID, is_owner: bool, tag: String,
+    //     { appType: String, created_at: DateTime<Utc>, created_by: ID, is_owner: bool, tag: String,
     //     uuid: UUID }
     //#[serde(rename = "iconClassNames")]
     //pub icon_class_names: Option<Value>, // undocumented
 }
 
 impl ZKObjectID for List {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 impl List {
@@ -1680,12 +1719,16 @@ pub struct User {
 }
 
 impl ZKObjectID for User {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Workspace
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Workspace {
     /// workspace id
     pub id: ID,
@@ -1702,11 +1745,11 @@ pub struct Workspace {
     #[serde(rename = "isDefault")]
     pub is_default: bool,
     /// The timestamp at which this element was created
-    pub created_at: String,
+    pub created_at: DateTime<Utc>,
     /// The timestamp at which this element was last updated
-    pub updated_at: String,
+    pub updated_at: DateTime<Utc>,
     /// The timestamp at which this element was deprecated. Is null if not deprecated
-    pub deprecated_at: Option<String>,
+    pub deprecated_at: Option<DateTime<Utc>>,
     /// workspace background theme
     #[serde(rename = "backgroundId")]
     pub background_id: Option<ID>,
@@ -1724,8 +1767,12 @@ pub struct Workspace {
 }
 
 impl ZKObjectID for Workspace {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 impl Workspace {
@@ -1766,7 +1813,7 @@ pub struct ResourceTag {
     #[serde(rename = "isOwner")]
     pub is_owner: bool,
     pub created_by: ID,
-    pub created_at: DateString,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(PartialEq, Debug, Serialize, Deserialize)]
@@ -1845,8 +1892,12 @@ pub struct Webhook {
 }
 
 impl ZKObjectID for Webhook {
-    fn get_id(&self) -> ID { self.id }
-    fn get_uuid(&self) -> &UUID { &self.uuid }
+    fn get_id(&self) -> ID {
+        self.id
+    }
+    fn get_uuid(&self) -> &UUID {
+        &self.uuid
+    }
 }
 
 /// Parameter for creating a new webhook
@@ -1971,7 +2022,9 @@ impl ElementChange {
                     Persons => ChangedData::Persons(serde_json::from_value(change_val)?),
                     References => ChangedData::References(serde_json::from_value(change_val)?),
                     Categories => ChangedData::Categories(serde_json::from_value(change_val)?),
-                    ElementCategoryId::Date => ChangedData::Date(serde_json::from_value(change_val)?),
+                    ElementCategoryId::Date => {
+                        ChangedData::Date(serde_json::from_value(change_val)?)
+                    }
                     // not yet implemented
                     ElementCategoryId::URL
                     | ElementCategoryId::Checkbox

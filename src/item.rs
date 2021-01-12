@@ -2,10 +2,7 @@ use crate::{
     types::{Entry, Field, ID, UUID},
     Error,
 };
-use std::{
-    iter::Iterator,
-    string::ToString,
-};
+use std::{iter::Iterator, string::ToString};
 
 /// Item in a list. Wrapper for Entry that includes field getters for business values.
 #[derive(Debug)]
@@ -92,28 +89,28 @@ impl<'li> Item<'li> {
     /// fname parameter may be field name, id, or uuid
     pub fn get_person_names(&self, fname: &str) -> Result<Vec<&str>, Error> {
         self.get_field(fname)
-            .map(|field| self.entry.get_person_names(&field.uuid))?
+            .map(|field| self.entry.get_person_names(&field.uuid))
     }
 
     /// Returns IDs of persons in field value.
     /// fname parameter may be field name, id, or uuid
     pub fn get_person_ids(&self, fname: &str) -> Result<Vec<ID>, Error> {
         self.get_field(fname)
-            .map(|field| self.entry.get_person_ids(&field.uuid))?
+            .map(|field| self.entry.get_person_ids(&field.uuid))
     }
 
     /// Returns uuids of referred objects in field value.
     /// fname parameter may be field name, id, or uuid
     pub fn get_references(&self, fname: &str) -> Result<Vec<&str>, Error> {
         self.get_field(fname)
-            .map(|field| self.entry.get_references(&field.uuid))?
+            .map(|field| self.entry.get_references(&field.uuid))
     }
 
     /// Returns array of choice (aka label/category) values.
     /// Array could be empty if none are selected
     pub fn get_choices(&self, fname: &str) -> Result<Vec<&str>, Error> {
         self.get_field(fname)
-            .map(|field| self.entry.get_category_names(&field.uuid))?
+            .map(|field| self.entry.get_category_names(&field.uuid))
     }
 
     /// Returns single choice value, or None if unselected.

@@ -1,13 +1,13 @@
 use lazy_static::lazy_static;
 
-/// Get message associated with error code. If message isn't found, returns the code
-pub fn lookup_error(code: &str) -> &str {
+/// Get message associated with error code. Returns None if not found
+pub fn lookup_error(code: &str) -> Option<&str> {
     for v in ERROR_CODES.iter() {
         if v.0 == code {
-            return v.1;
+            return Some(v.1);
         }
     }
-    code
+    None
 }
 
 lazy_static! {

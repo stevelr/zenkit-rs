@@ -23,6 +23,9 @@ pub enum Error {
     /// First param is general message, second is field name
     MultiCategory(String, String),
 
+    /// Api token has not been set
+    MissingAPIToken(String),
+
     /// Error if static object is already initialized
     AlreadyInitialized,
     /// Error if static initializer was not called before getter
