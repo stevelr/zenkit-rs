@@ -2,3 +2,4 @@ target
 env
 tmp
 Cargo.lock
+.idea
