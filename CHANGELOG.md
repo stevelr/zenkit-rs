@@ -1,5 +1,9 @@
 # Changelog for zenkit-rs (https://github.com/stevelr/zenkit-rs)
 
+## v0.5.1 2020-01-17
+
+- removed dependency on uuid crate
+
 ## v0.5.0 2021-01-12
 
 - upgraded to reqwest 0.11

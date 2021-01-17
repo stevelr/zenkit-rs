@@ -10,7 +10,6 @@ use crate::{
 };
 use serde_json::{json, Value};
 use std::{fmt, iter::Iterator, rc::Rc, string::ToString};
-use uuid::Uuid;
 
 /// A read-only reference to a List and its fields
 /// To modify list field definitions, use methods of workspace ..
@@ -431,16 +430,21 @@ impl std::ops::Deref for ListInfo {
 }
 
 /// Returns true if the parameter is a valid uuid
-/// It's possible that the uuid crate supports formats that aren't supported by Zenkit.
-/// To reduce the chance of false positives, we also require the input to be 36 chars.
-/// The fname parameter is used for error messages
+/// This is not an exact test for uuid, but serves its primary purpose in detecting
+/// accidental errors of passing an ID when a uuid is required.
 pub(crate) fn check_uuid(uuid: &str, fname: &str) -> Result<(), Error> {
-    match uuid.len() == 36 && Uuid::parse_str(uuid).is_ok() {
-        true => Ok(()),
-        false => Err(Error::Other(format!(
-            "Not a valid uuid '{}' for field '{}'",
+    if uuid.len() != 36
+        || uuid
+            .as_bytes()
+            .iter()
+            .any(|c| (*c) != b'-' && !c.is_ascii_hexdigit())
+    {
+        Err(Error::Other(format!(
+            "Invalid uuid '{}' for field {}",
             uuid, fname
-        ))),
+        )))
+    } else {
+        Ok(())
     }
 }
 
