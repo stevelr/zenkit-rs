@@ -1,5 +1,13 @@
 # Changelog for zenkit-rs (https://github.com/stevelr/zenkit-rs)
 
+## v0.6.0
+
+- Activity.list_entry_description changed from String to Option<String>
+  because it doesn't always appear in Activity events and breaks json
+  deserialization. Because this is an api change, semver rules say 
+  version must increase to 0.6.
+- Added License files to repo. License (MIT OR Apache-2.0) is unchanged.
+
 ## v0.5.1 2020-01-17
 
 - removed dependency on uuid crate

@@ -802,8 +802,8 @@ pub struct Activity {
     //pub short_id: ShortId,
     /// activity uuid
     pub uuid: UUID,
-    #[serde(rename = "type")]
     /// Activity type
+    #[serde(rename = "type")]
     pub activity_type: ActivityType,
     /// object type
     pub created_in: ActivityCreatedIn,
@@ -893,7 +893,7 @@ pub struct Activity {
     pub list_entry_name: Option<String>,
     /// description of activity's subject, if it is a list entry
     #[serde(rename = "listEntryDescription")]
-    pub list_entry_description: String,
+    pub list_entry_description: Option<String>,
     /// date at which activity's subject was deprecated, if it is a list entry
     #[serde(rename = "listEntryDeprecated_at")]
     pub list_entry_deprecated_at: Option<DateTime<Utc>>,
@@ -1359,8 +1359,7 @@ impl Entry {
         pred: fn(&'v Value) -> Option<T>,
     ) -> Vec<T> {
         let field_name = format!("{}_{}", field_uuid, field_kind);
-        self
-            .fields
+        self.fields
             .get(&field_name)
             .map(|v| v.as_array())
             .unwrap_or_default()
