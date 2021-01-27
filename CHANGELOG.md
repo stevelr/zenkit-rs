@@ -1,6 +1,23 @@
 # Changelog for zenkit-rs (https://github.com/stevelr/zenkit-rs)
 
-## v0.6.0
+## v0.6.1 2021-01-26
+
+- fix: fixed parsing and deserialization of DateTime, so it now works 
+  whether the field contains a full datetime or 
+  just a date ("YYYY-MM-DD"). The shorter version can happen for fields
+  that are set to allow date entry without time, in which case
+  the parser/deserializer appends time 00:00:00
+
+  Making this work required implementation of an internal DateTime,
+  a tuple struct wrapping a chrono::DateTime. The crate already 
+  exported DateTime, so for any uses of zenkit::DateTime, this 
+  should not be a breaking change. zenkit::DateTime<Tz> also implements 
+  Deref to chrono::DateTime<Tz>, so most uses of chrono::DateTime 
+  methods on zenkit::DateTime should also work unchanged.
+
+  Created unit tests for DateTime.
+
+## v0.6.0 2021-01-23
 
 - Activity.list_entry_description changed from String to Option<String>
   because it doesn't always appear in Activity events and breaks json

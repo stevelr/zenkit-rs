@@ -19,13 +19,15 @@
 //!   (String -> UUID, int -> ID, String -> DateTime<Utc>), etc.
 
 use crate::{f32_or_str, Error};
-pub use chrono::{DateTime, Utc};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::{clone::Clone, default::Default, fmt, iter::Iterator};
+use std::{clone::Clone, default::Default, fmt, iter::Iterator, str::FromStr};
+
+// re-export
+pub use crate::datetime::{DateTime, Utc};
 
 // re-export from item and list
 pub use crate::{
@@ -1844,7 +1846,7 @@ impl Default for TextFormat {
     }
 }
 
-impl std::str::FromStr for TextFormat {
+impl FromStr for TextFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
