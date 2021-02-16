@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+#![allow(missing_docs, clippy::upper_case_acronyms)]
 //! This module defines the data types used in the ZenKit Api. Most are specified
 //! by [Zenkit API Docs](https://base.zenkit.com/docs/api/overview/introduction),
 //! and a few have been added to make the code more Rust-idiomatic.
@@ -2073,11 +2073,11 @@ impl<'de> Deserialize<'de> for ElementChange {
         D: Deserializer<'de>,
     {
         let v = Value::deserialize(deserializer)?;
-        Ok(ElementChange::from(v).map_err(|e| {
+        ElementChange::from(v).map_err(|e| {
             serde::de::Error::invalid_value(
                 serde::de::Unexpected::Other(&e.to_string()),
                 &"changed_data",
             )
-        })?)
+        })
     }
 }

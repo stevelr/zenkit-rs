@@ -75,7 +75,7 @@ impl ApiClient {
                     .to_string(),
                 // couldn't tell if env is set
             };
-            return Err(Error::MissingAPIToken(msg));
+            return Err(Error::MissingApiToken(msg));
         }
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

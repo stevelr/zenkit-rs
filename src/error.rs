@@ -11,11 +11,11 @@ pub enum Error {
     /// Network error (reported by reqwest http client)
     //NetError(String),
     /// Invalid utf-8 (converting binary to text)
-    UTF8Error(String),
+    Utf8Error(String),
     /// URL parsing error
     ParseError(String),
     /// IO error - used for verbose http logging to files
-    IOError(String),
+    IoError(String),
     /// Error returned by reqwest library
     Reqwest(reqwest::Error),
 
@@ -24,7 +24,7 @@ pub enum Error {
     MultiCategory(String, String),
 
     /// Api token has not been set
-    MissingAPIToken(String),
+    MissingApiToken(String),
 
     /// Error if static object is already initialized
     AlreadyInitialized,
@@ -63,13 +63,13 @@ impl From<reqwest::Error> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Error::IOError(format!("{:?}", e))
+        Error::IoError(format!("{:?}", e))
     }
 }
 
 impl From<std::str::Utf8Error> for Error {
     fn from(e: std::str::Utf8Error) -> Self {
-        Error::UTF8Error(format!("Invalid UTF-8: {}", e.to_string()))
+        Error::Utf8Error(format!("Invalid UTF-8: {}", e.to_string()))
     }
 }
 

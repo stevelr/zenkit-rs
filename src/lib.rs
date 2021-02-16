@@ -32,7 +32,7 @@ pub fn init_api(config: ApiConfig) -> Result<&'static ApiClient, Error> {
 
 /// Returns API handle, or error if not initialized
 pub fn get_api() -> Result<&'static ApiClient, Error> {
-    Ok(API.get().ok_or(Error::NotInitialized)?)
+    API.get().ok_or(Error::NotInitialized)
 }
 
 /// Zenkit API common Traits and structs
