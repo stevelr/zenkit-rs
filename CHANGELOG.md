@@ -1,5 +1,9 @@
 # Changelog for zenkit-rs (https://github.com/stevelr/zenkit-rs)
 
+## v0.6.2 2021-02-16
+
+- updated dependencies: bytes (0.5 to 1.0), strum-macros (0.19-0.20)
+
 ## v0.6.1 2021-01-26
 
 - fix: fixed parsing and deserialization of DateTime, so it now works 
